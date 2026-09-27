@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, Optional
 class ErrorKind:
     VALIDATION="validation"; NOT_FOUND="not_found"; FORBIDDEN="forbidden"; CONFLICT="conflict"
@@ -36,3 +37,19 @@ def require_number(value,field,minimum=0.0):
     return number
 def ensure_role(role,allowed):
     if role not in allowed: raise PermissionDenied("当前角色无权执行该操作")
+def require_iso_date(value,field):
+    if not isinstance(value,str): raise ValidationError(f"{field}必须是YYYY-MM-DD格式的日期")
+    text=value.strip()
+    try: datetime.strptime(text,"%Y-%m-%d")
+    except ValueError: raise ValidationError(f"{field}必须是YYYY-MM-DD格式的日期")
+    return text
+def require_materials(value,field="materials"):
+    if not isinstance(value,(list,tuple)) or len(value)==0: raise ValidationError(f"{field}不能为空")
+    materials=[]
+    for entry in value:
+        materials.append(require_text(entry,f"{field}条目",200))
+    if len(materials)>50: raise ValidationError(f"{field}不能超过50项")
+    return materials
+def require_expected_version(value,field="expected_version"):
+    if isinstance(value,bool) or not isinstance(value,int) or value<1: raise ValidationError(f"{field}必须是正整数")
+    return value

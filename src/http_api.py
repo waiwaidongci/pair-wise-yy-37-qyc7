@@ -89,6 +89,20 @@ def make_handler(service: Service, static_dir: str):
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"records": service.list_records(item_id, role)})
+                elif path.startswith("/api/items/") and path.endswith("/renewals"):
+                    item_id = int(path.split("/")[3])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"renewals": service.list_renewals(item_id, role)})
+                elif path == "/api/renewals":
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"renewals": service.list_renewals(None, role)})
+                elif path.startswith("/api/renewals/") and path.count("/") == 3:
+                    renewal_id = int(path.split("/")[3])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, service.renewal_detail(renewal_id, role))
                 elif path.startswith("/api/items/"):
                     item_id = int(path.rsplit("/", 1)[-1])
                     actor, role = self._identity()
@@ -113,6 +127,15 @@ def make_handler(service: Service, static_dir: str):
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/renewals"):
+                    item_id = int(path.split("/")[3])
+                    self._json(201, service.submit_renewal(item_id, body, actor, role))
+                elif path.startswith("/api/renewals/") and path.endswith("/resubmit"):
+                    renewal_id = int(path.split("/")[3])
+                    self._json(200, service.resubmit_renewal(renewal_id, body, actor, role))
+                elif path.startswith("/api/renewals/") and path.endswith("/decision"):
+                    renewal_id = int(path.split("/")[3])
+                    self._json(200, service.review_renewal(renewal_id, body, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/transition"):
                     item_id = int(path.split("/")[3])
                     target = body.get("target")
