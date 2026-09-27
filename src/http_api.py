@@ -89,15 +89,35 @@ def make_handler(service: Service, static_dir: str):
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"records": service.list_records(item_id, role)})
+                elif path.startswith("/api/items/") and path.endswith("/renewals"):
+                    item_id = int(path.split("/")[3])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"renewals": service.list_renewals(item_id, role)})
                 elif path.startswith("/api/items/"):
                     item_id = int(path.rsplit("/", 1)[-1])
                     actor, role = self._identity()
                     del actor
                     self._json(200, service.get_item(item_id, role))
+                elif path.startswith("/api/renewals/"):
+                    renewal_no = path.rsplit("/", 1)[-1]
+                    actor, role = self._identity()
+                    del actor
+                    query = parse_qs(urlparse(self.path).query)
+                    item_id = int(query["item_id"][0]) if query.get("item_id") else None
+                    self._json(200, service.get_renewal(item_id, renewal_no, role))
+                elif path == "/api/renewals":
+                    actor, role = self._identity()
+                    del actor
+                    query = parse_qs(urlparse(self.path).query)
+                    item_id = int(query["item_id"][0]) if query.get("item_id") else None
+                    self._json(200, {"renewals": service.list_renewals(item_id, role)})
                 elif path == "/api/audit":
                     actor, role = self._identity()
                     del actor
-                    self._json(200, {"events": service.audit(role)})
+                    query = parse_qs(urlparse(self.path).query)
+                    item_id = int(query["item_id"][0]) if query.get("item_id") else None
+                    self._json(200, {"events": service.audit(role, item_id)})
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:
@@ -113,6 +133,23 @@ def make_handler(service: Service, static_dir: str):
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/renewals"):
+                    item_id = int(path.split("/")[3])
+                    self._json(201, service.submit_renewal(item_id, body, actor, role))
+                elif path.startswith("/api/renewals/"):
+                    renewal_no = path.rsplit("/", 1)[-1]
+                    item_id = body.get("item_id")
+                    if not isinstance(item_id, int):
+                        raise ValidationError("item_id必须是整数")
+                    action = body.get("action", "supplement")
+                    if action == "supplement":
+                        self._json(200, service.supplement_renewal(
+                            item_id, renewal_no, body, actor, role))
+                    elif action == "review":
+                        self._json(200, service.review_renewal(
+                            item_id, renewal_no, body, actor, role))
+                    else:
+                        raise ValidationError("action必须是supplement或review")
                 elif path.startswith("/api/items/") and path.endswith("/transition"):
                     item_id = int(path.split("/")[3])
                     target = body.get("target")

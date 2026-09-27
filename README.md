@@ -26,13 +26,24 @@ python3 app.py --db ./data.db --port 8314
 
 - `GET /health`
 - `GET /api/items`
-- `POST /api/items`
+- `POST /api/items`，可选`valid_from`、`valid_until`（YYYY-MM-DD或ISO时间）设置许可期限
 - `GET /api/items/{id}`
 - `POST /api/items/{id}/records`
 - `POST /api/items/{id}/transition`，必须提交`expected_version`
-- `GET /api/audit`
+- `POST /api/items/{id}/renewals`：申请人按`permit_no`（原许可号）和`expected_version`（当前版本）提交续期，含新期限与`materials`
+- `GET /api/items/{id}/renewals`、`GET /api/renewals?item_id={id}`：续期列表
+- `GET /api/renewals/{renewal_no}?item_id={id}`：续期详情，含全部材料与历次审批意见
+- `POST /api/renewals/{renewal_no}`：`action=supplement`补件再提交（沿用原编号）；`action=review`合规负责人审批（`decision=approve|return`，退回必须给`opinion`）
+- `GET /api/audit`，支持`item_id`过滤
 
 允许角色：applicant, inspector, compliance_manager, viewer。申报量超过许可量或检查发现高严重度问题时提高优先级；存在未关闭整改时不能批准。
+
+### 续期办理规则
+
+- 仅已批准的许可可续期；同一许可同时只有一份待审申请（submitted/returned），重复提交被拒绝并提示沿用原编号；退回后补件再提交沿用同一`renewal_no`。
+- 申请人必须按原许可号和许可当前版本提交，新期限截止时间必须晚于当前时间。
+- 合规负责人核对材料后批准或退回；退回必须填写意见，所有意见按时间顺序保留在续期详情中。
+- 材料缺失或原许可已过期时不能批准；批准后新期限写入许可且许可版本递增，原检查记录、历次申请与审批过程仍可通过续期详情和审计链查询。
 
 ## 测试
 

@@ -1,8 +1,11 @@
 from __future__ import annotations
-from .domain import ConflictError, ValidationError
-TITLE='空气污染源许可与合规检查'; ENTITY='排污许可'; ID_PREFIX='AQ'
+from datetime import datetime, timezone
+from .domain import ConflictError, ValidationError, parse_timepoint
+TITLE='空气污染源许可与合规检查'; ENTITY='排污许可'; RENEWAL_ENTITY='续期申请'; ID_PREFIX='AQ'
 SEVERITIES=['low', 'medium', 'high', 'critical']; STATES=['draft', 'submitted', 'inspection', 'correction', 'approved']; TRANSITIONS={'draft': ['submitted'], 'submitted': ['inspection'], 'inspection': ['correction'], 'correction': ['approved'], 'approved': []}; TRANSITION_ROLES={'submitted': ['applicant'], 'inspection': ['inspector'], 'correction': ['inspector'], 'approved': ['compliance_manager']}
 CREATE_ROLES=set(['applicant']); RECORD_ROLES=set(['applicant', 'inspector']); AUDIT_ROLES=set(['compliance_manager', 'viewer']); VIEW_ROLES=set(['applicant', 'inspector', 'compliance_manager', 'viewer'])
+RENEWAL_SUBMIT_ROLES=set(['applicant']); RENEWAL_REVIEW_ROLES=set(['compliance_manager']); RENEWAL_VIEW_ROLES=VIEW_ROLES
+RENEWAL_ACTIVE_STATUSES=('submitted', 'returned')
 SEVERITY_WEIGHT={'low': 1.0, 'medium': 3.0, 'high': 6.0, 'critical': 9.0}; DEADLINE_HOURS={'low': 72, 'medium': 24, 'high': 8, 'critical': 4}; TERMINAL_STATES=set(['approved'])
 def priority_score(severity,quantity=0.0,threshold=1.0,open_records=0):
     if severity not in SEVERITY_WEIGHT: raise ValidationError("unknown severity")
@@ -20,3 +23,15 @@ def validate_transition(current,target):
     if not can_transition(current,target): raise ConflictError(f"不能从{current}转换到{target}")
 def completion_blockers(target,open_records): return ["仍有未关闭事项"] if target in TERMINAL_STATES and open_records>0 else []
 def role_for_transition(target): return set(TRANSITION_ROLES.get(target,[]))
+def permit_expired(valid_until, now=None):
+    """许可截止时间已过视为过期；未设置期限的许可不会被判为过期。"""
+    if not valid_until: return False
+    point=parse_timepoint(valid_until, "valid_until", end_of_day=True)
+    current=now or datetime.now(timezone.utc)
+    return point<current
+def renewal_blockers(materials, valid_until, now=None):
+    """续期批准前置不变量：材料齐备且原许可未过期。"""
+    blockers=[]
+    if not materials: blockers.append("续期材料缺失，不能批准")
+    if permit_expired(valid_until, now): blockers.append("原许可已过期，不能批准续期")
+    return blockers
